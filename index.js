@@ -1,6 +1,8 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const JWTSecret = "secret";
 
 app.use(cors());
 app.use(express.urlencoded({extended:false}));
@@ -44,13 +46,40 @@ var DB = {
     ]
 }
 
+function authUser(req, res, next){
+    const authToken = req.headers['authorization'];
+    if(authToken != undefined){
+        const bearer = authToken.split(" ");
+        var token = bearer[1];
+        jwt.verify(token, JWTSecret,(err,data) => {
+            if(err){
+                res.status(401).json({err: "token inválido"})
+            }else{
+                req.token = token;
+                req.loggedUser = {id: data.id, email: data.email};
+                next();
+            }
+        });
+    }else{
+        res.status(401).json({err:"token inválido"});
+    }
+}
+
 app.post("/auth", (req,res) => {
     var {email,password} = req.body;
     if(email != undefined){
         var user = DB.users.find(user => user.email == email);
         if(user != undefined){
             if(user.password == password){
-                res.status(200).json({token: "token falso."});
+                jwt.sign({id: user.id, email: user.email}, JWTSecret, {expiresIn:'48h'},(err,token) => {
+                    if(err){
+                       res.status(401).json({err:"falha interna"});
+                    }else{
+                       res.status(200).json({token:token});
+                    }
+                
+                });
+
             }else{
                 res.status(401).json({err: "credenciais inválidas."});
             }
@@ -62,11 +91,11 @@ app.post("/auth", (req,res) => {
     }
 });
 
-app.get("/games", (req, res) => {
+app.get("/games",authUser, (req, res) => {
     res.status(200).json(DB.games);
 });
 
-app.post("/game", (req, res) => {   
+app.post("/game",authUser, (req, res) => {   
     var {title, price, year} = req.body;
     DB.games.push({
         id: contId,
@@ -79,7 +108,7 @@ app.post("/game", (req, res) => {
 
 });
 
-app.delete("/game/:id", (req,res) =>{
+app.delete("/game/:id",authUser, (req,res) =>{
     if(isNaN(req.params.id)){
         res.sendStatus(400);
     }else{
@@ -94,7 +123,7 @@ app.delete("/game/:id", (req,res) =>{
     }
 });
 
-app.get("/game/:id", (req,res) =>{
+app.get("/game/:id",authUser, (req,res) =>{
 
     if(isNaN(req.params.id)){
         res.sendStatus(400);
@@ -109,7 +138,7 @@ app.get("/game/:id", (req,res) =>{
     }
 });
 
-app.put("/game/:id", (req,res) =>{
+app.put("/game/:id",authUser, (req,res) =>{
 
     if(isNaN(req.params.id)){
         res.sendStatus(400);
