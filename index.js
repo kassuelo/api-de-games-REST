@@ -92,6 +92,7 @@ app.post("/auth", (req,res) => {
 });
 
 app.get("/games",authUser, (req, res) => {
+
     res.status(200).json(DB.games);
 });
 
@@ -129,9 +130,26 @@ app.get("/game/:id",authUser, (req,res) =>{
         res.sendStatus(400);
     }else{
         var id = parseInt(req.params.id);
+        var hateoas = [
+            {
+                href: "http://localhost:45678/game/"+id,
+                method: "DELETE",
+                rel: "delete_game"
+            },
+            {
+                href: "http://localhost:45678/game/"+id,
+                method: "PUT",
+                rel: "edit_game"
+            },
+            {
+                href: "http://localhost:45678/games",
+                method: "GET",
+                rel: "get_all_games"
+            }
+        ]
         var game = DB.games.find(g => g.id == id);
         if(game != undefined){
-            res.status(200).json(game);
+            res.status(200).json({game:game, links:hateoas});
         }else{
             res.sendStatus(404);
         }
